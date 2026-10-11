@@ -1,0 +1,92 @@
+name: Build Android APK
+
+# Source pushes to master do not build. Advance apk-build or manually dispatch.
+on:
+  push:
+    branches: [apk-build]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      APK_KEYSTORE_BASE64: ${{ secrets.APK_KEYSTORE_BASE64 }}
+      APK_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
+      APK_KEY_ALIAS: ${{ secrets.APK_KEY_ALIAS }}
+      APK_KEY_PASSWORD: ${{ secrets.APK_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Configure optional stable development signing
+        shell: bash
+        run: |
+          if [ -n "$APK_KEYSTORE_BASE64" ] && [ -n "$APK_KEYSTORE_PASSWORD" ] &&
+             [ -n "$APK_KEY_ALIAS" ] && [ -n "$APK_KEY_PASSWORD" ]; then
+            printf '%s' "$APK_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/tasker-signing.keystore"
+            printf 'APK_SIGNING_STORE_FILE=%s\n' "$RUNNER_TEMP/tasker-signing.keystore" >> "$GITHUB_ENV"
+            echo "Using configured stable development signing key"
+          else
+            echo "::warning::No complete signing secret set: this APK uses a temporary runner debug certificate."
+          fi
+      - name: Assemble requested debug APK
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+      - name: Verify APK identity and integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$apk"
+          unzip -t "$apk" >/dev/null
+          apksigner verify --verbose --print-certs "$apk"
+          aapt dump badging "$apk" | head -20
+          aapt dump badging "$apk" | grep -q "package: name='com.matejdro.taskertethercontrol'"
+          cp "$apk" TaskerTetherControl-debug.apk
+          sha256sum TaskerTetherControl-debug.apk > TaskerTetherControl-debug.apk.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TaskerTetherControl-debug-apk
+          path: |
+            TaskerTetherControl-debug.apk
+            TaskerTetherControl-debug.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: assemble
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: TaskerTetherControl-debug-apk
+      - name: Validate artifact and publish direct APK download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum -c TaskerTetherControl-debug.apk.sha256
+          gh release create "apk-build-${GITHUB_RUN_NUMBER}" \
+            "TaskerTetherControl-debug.apk#TaskerTetherControl-debug.apk" \
+            "TaskerTetherControl-debug.apk.sha256#SHA-256 checksum" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "TaskerTetherControl debug build ${GITHUB_RUN_NUMBER}" \
+            --notes "Requested CI build from commit ${GITHUB_SHA}. Debug APK. Android 15 tethering behavior has not been tested. Missing signing secrets cause a temporary debug signing certificate." \
+            --prerelease \
+            --latest=false
