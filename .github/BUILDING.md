@@ -19,3 +19,21 @@ The Android application ID stays `com.matejdro.taskertethercontrol`. Version cod
 ## Android runtime warning
 
 The original code dates from 2017 and relies on hidden connectivity APIs, privileged permissions, and legacy /system remount behavior. A successful Android build does **not** establish functional tethering on Android 15 or dynamic-partition Pixel devices. Device testing and modern platform changes are separate work.
+
+## Systemless privileged app installation
+
+The in-app **Install using Magisk** button packages the installed APK and
+`privapp-permissions` XML into a module ZIP, confirms the user wants to
+install it, and invokes `su -c magisk --install-module` from a root command.
+The module adds a privileged-app overlay at the next reboot; the old
+`mount -o rw,remount /system` procedure is completely removed.
+
+This option requires a functional Magisk installation. KernelSU/APatch
+are not supported by this button. If installation fails, copy the installer
+output, inspect the Magisk module list, and do not try manually remounting
+`/system`. Removing or disabling the module in Magisk reverts the overlay.
+
+A modern Pixel 9 does not permit the 2017 style writable-system APK
+installation. This fix only handles the installation workflow, not the
+private tethering APIs used by `TaskerReceiver`. Android 15 runtime
+functionality still needs physical-device validation.

@@ -127,7 +127,13 @@ public class TetherSetupActivity extends TaskerSetupActivity {
             return;
         }
 
-        new SystemInstallTask(this).execute((Void[]) null);
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(R.string.magisk_install_confirm_title)
+                .setMessage(R.string.magisk_install_confirm_text)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.magisk_install_confirm_button,
+                        (dialog, which) -> new SystemInstallTask(this).execute((Void[]) null))
+                .show();
     }
 
 }

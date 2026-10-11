@@ -2,17 +2,23 @@
     <string name="disable_tethering">Disable tethering</string>
     <string name="enable_tethering">Enable tethering</string>
     <string name="plugin_action">Plugin action:</string>
-    <string name="no_system_warning">If plugin still does not work, you can try installing it to the system. This requires root access.</string>
+    <string name="no_system_warning">If tethering fails due to missing privileged permissions, you can install a systemless Magisk module. This requires Magisk, root approval, and a reboot. Android 15 tethering compatibility is not guaranteed.</string>
     <string name="no_settings_permission_warning">Plugin will not work without app being granted system settings permission.</string>
-    <string name="install_app_to_the_system">Install app to the system</string>
+    <string name="install_app_to_the_system">Install using Magisk</string>
     <string name="open_settings">Open settings</string>
 
     <string name="unknown_error">Unknown error</string>
-    <string name="no_root">Your device does not appear to be rooted.</string>
+    <string name="no_root">Root access was denied or is unavailable.</string>
     <string name="install_success">Install successful</string>
     <string name="install_failed">Install failed</string>
-    <string name="reboot_request">Please reboot your phone to make system recognize new system app</string>
+    <string name="reboot_request">Magisk has staged the systemless module. Reboot your phone to activate it. You can disable or remove the module in Magisk if necessary.</string>
     <string name="toggle_tethering">Toggle Tethering</string>
     <string name="error_no_settings_permission">No \"modify system settings\" permission. Open config dialog.\n\n</string>
-    <string name="error_root_needed">System install (ROOT) needed. Open config dialog.\n\n</string>
+    <string name="error_root_needed">Privileged tethering permission may be required. Open config dialog for Magisk setup.\n\n</string>
+    <string name="magisk_missing">Magisk root is required. This installer will not remount or write to /system. If you use KernelSU or another root provider, this version does not support its module installer.</string>
+    <string name="magisk_install_confirm_title">Install Magisk module?</string>
+    <string name="magisk_install_confirm_text">This will stage a systemless privileged-app module using Magisk, not modify the read-only system partition. A reboot is required. A module can interfere with boot or system permissions; you can disable it in Magisk. It does not guarantee that the 2017 tethering method works on Android 15.</string>
+    <string name="magisk_install_confirm_button">Install module</string>
+    <string name="magisk_install_progress">Installing systemless Magisk module…</string>
+    <string name="magisk_install_timeout">The Magisk command timed out. Check root approval in Magisk and retry.</string>
 </resources>
