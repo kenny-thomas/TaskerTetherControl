@@ -50,9 +50,9 @@ jobs:
           apk=app/build/outputs/apk/debug/app-debug.apk
           test -s "$apk"
           unzip -t "$apk" >/dev/null
-          apksigner verify --verbose --print-certs "$apk"
-          aapt dump badging "$apk" | head -20
-          aapt dump badging "$apk" | grep -q "package: name='com.matejdro.taskertethercontrol'"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | sed -n '1,20p'
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.matejdro.taskertethercontrol'"
           cp "$apk" TaskerTetherControl-debug.apk
           sha256sum TaskerTetherControl-debug.apk > TaskerTetherControl-debug.apk.sha256
       - uses: actions/upload-artifact@v4
