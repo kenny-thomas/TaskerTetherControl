@@ -6,6 +6,9 @@ def signingPassword = System.getenv('APK_KEYSTORE_PASSWORD')
 def signingAlias = System.getenv('APK_KEY_ALIAS')
 def signingKeyPassword = System.getenv('APK_KEY_PASSWORD')
 def hasCiSigner = signingPath && signingPassword && signingAlias && signingKeyPassword
+if (System.getenv('CI') == 'true' && !hasCiSigner) {
+    throw new GradleException('CI builds require a persistent signing keystore; refusing an ephemeral debug key.')
+}
 
 android {
     namespace 'com.matejdro.taskertethercontrol'

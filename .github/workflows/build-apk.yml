@@ -30,17 +30,28 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-      - name: Configure optional stable development signing
+      - name: Require persistent update signing key
         shell: bash
         run: |
-          if [ -n "$APK_KEYSTORE_BASE64" ] && [ -n "$APK_KEYSTORE_PASSWORD" ] &&
-             [ -n "$APK_KEY_ALIAS" ] && [ -n "$APK_KEY_PASSWORD" ]; then
-            printf '%s' "$APK_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/tasker-signing.keystore"
-            printf 'APK_SIGNING_STORE_FILE=%s\n' "$RUNNER_TEMP/tasker-signing.keystore" >> "$GITHUB_ENV"
-            echo "Using configured stable development signing key"
-          else
-            echo "::warning::No complete signing secret set: this APK uses a temporary runner debug certificate."
+          set -euo pipefail
+          for variable in APK_KEYSTORE_BASE64 APK_KEYSTORE_PASSWORD APK_KEY_ALIAS APK_KEY_PASSWORD; do
+            if [ -z "${!variable}" ]; then
+              echo "::error::Missing $variable. Configure the stable app signing secrets; refusing to publish a temporary-key APK."
+              exit 1
+            fi
+          done
+          umask 077
+          printf '%s' "$APK_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/tasker-signing.keystore"
+          test -s "$RUNNER_TEMP/tasker-signing.keystore"
+          actual="$(keytool -list -v -keystore "$RUNNER_TEMP/tasker-signing.keystore" -storepass "$APK_KEYSTORE_PASSWORD" -alias "$APK_KEY_ALIAS" |
+            sed -n 's/^[[:space:]]*SHA256: //p' | head -n 1 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          expected="$(cat .github/signing-certificate.sha256 | tr -d '\r\n')"
+          if [ -z "$actual" ] || [ "$actual" != "$expected" ]; then
+            echo "::error::Unexpected signing certificate. Refusing an APK that cannot update the installed stable-key version."
+            exit 1
           fi
+          printf 'APK_SIGNING_STORE_FILE=%s\n' "$RUNNER_TEMP/tasker-signing.keystore" >> "$GITHUB_ENV"
+          echo "Signing certificate matches pinned repository fingerprint."
       - name: Assemble requested debug APK
         run: gradle --no-daemon --stacktrace :app:assembleDebug
       - name: Verify APK identity and integrity
@@ -51,6 +62,14 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk"
+          signed_by="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk" |
+            sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1 | tr '[:upper:]' '[:lower:]')"
+          expected="$(cat .github/signing-certificate.sha256 | tr -d '\r\n')"
+          if [ "$signed_by" != "$expected" ]; then
+            echo "::error::Built APK is not signed with the pinned update certificate."
+            exit 1
+          fi
+          echo "APK verified against persistent signing certificate: $expected"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | sed -n '1,20p'
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.matejdro.taskertethercontrol'"
           cp "$apk" TaskerTetherControl-debug.apk
@@ -87,6 +106,6 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "TaskerTetherControl debug build ${GITHUB_RUN_NUMBER}" \
-            --notes "Requested CI build from commit ${GITHUB_SHA}. Debug APK. Android 15 tethering behavior has not been tested. Missing signing secrets cause a temporary debug signing certificate." \
+            --notes "Requested CI build from commit ${GITHUB_SHA}. Stable certificate signed debug APK. Android 15 tethering behavior has not been tested." \
             --prerelease \
             --latest=false

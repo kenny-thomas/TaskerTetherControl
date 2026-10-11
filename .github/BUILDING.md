@@ -7,14 +7,55 @@ This repository contains the original Java Tasker/Locale plug-in. Its Gradle con
 - CI uses JDK 17, Gradle 8.11.1, Android Gradle Plugin 8.10.1, and Android SDK 35.
 - Successful builds are uploaded as 30-day GitHub Actions artifacts and published in a GitHub prerelease with a **direct .apk download** and SHA-256 checksum. Publishing consumes the existing artifact without a second Gradle build.
 
-## Stable development APK signing
+## Stable signing and in-place updates
 
-For install-in-place upgrades, configure all four encrypted GitHub Actions repository secrets:
-`APK_KEYSTORE_BASE64`, `APK_KEYSTORE_PASSWORD`, `APK_KEY_ALIAS`, and `APK_KEY_PASSWORD`.
+**CI now refuses to build/publish if the permanent signing secrets are missing or
+the certificate does not match** `.github/signing-certificate.sha256`.
+There is no fallback to a temporary runner debug certificate. A mismatched signing
+certificate fails the build before publishing an APK.
 
-Store a backed-up per-app development keystore securely; put only its base64 encoding in the secret. Do not commit keystores or passwords. If secrets are absent, each ephemeral runner's default debug key is used, so updates can require uninstalling an APK built by an earlier run. Production builds should have a separate production key.
+This repository is **public**. NEVER commit a keystore, passwords, a signing
+bundle, or GitHub Actions secrets to the repository or a release.
 
-The Android application ID stays `com.matejdro.taskertethercontrol`. Version codes increase by run number within this workflow history.
+The persistent application certificate fingerprint (SHA-256) is:
+
+```text
+01d3dc30858c351b650d4a0be379cf708f52f3a3efdb87f6e3cc3fbe3deea367
+```
+
+Download and securely back up your private signing bundle from your ChatGPT
+project attachment. It contains the **single permanent app signing key** and
+`signing-secrets.env`. The key must be retained for *all* future updates.
+Using GitHub's repository **Settings → Secrets and variables → Actions →
+New repository secret**, create these four secrets from the .env file:
+
+- `APK_KEYSTORE_BASE64`
+- `APK_KEYSTORE_PASSWORD`
+- `APK_KEY_ALIAS`
+- `APK_KEY_PASSWORD`
+
+You can instead run this command locally if GitHub CLI is logged in, from the
+directory containing `signing-secrets.env`:
+
+```sh
+gh secret set --repo kenny-thomas/TaskerTetherControl -f signing-secrets.env
+```
+
+GitHub connections used to maintain this repository cannot write Actions
+secrets, so the repository owner must provision these once. Do not put the
+private bundle into Git, a public gist, or GitHub Actions build logs.
+
+**One-time transition:** builds #2 and #3 were signed on disposable Actions
+runners. Their private keys are unavailable, so no newly signed APK can update
+those installations in place. Remove the old Magisk module (if installed),
+reboot, uninstall the previous APK, and then install the new permanent-key
+signed APK. Afterwards, future builds signed with this same certificate and
+higher version codes can install directly as updates. Consider backing up
+Tasker configurations if uninstalling would lose any settings.
+
+The app ID remains `com.matejdro.taskertethercontrol`, and CI `versionCode`
+is `7000 + GITHUB_RUN_NUMBER`. Do not change workflow identities/version
+counters without ensuring the next code exceeds the currently installed APK.
 
 ## Android runtime warning
 
