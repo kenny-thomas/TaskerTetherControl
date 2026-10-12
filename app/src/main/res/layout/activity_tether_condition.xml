@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    android:orientation="vertical">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/condition_description"
+        android:paddingBottom="12dp"/>
+
+    <RadioGroup
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+        <RadioButton
+            android:id="@+id/conditionHotspotOn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/condition_hotspot_on"/>
+        <RadioButton
+            android:id="@+id/conditionHotspotOff"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/condition_hotspot_off"/>
+        <RadioButton
+            android:id="@+id/conditionClientsOn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/condition_clients_on"/>
+        <RadioButton
+            android:id="@+id/conditionClientsOff"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/condition_clients_off"/>
+    </RadioGroup>
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="14dp"
+        android:text="@string/condition_help"/>
+</LinearLayout>
