@@ -37,7 +37,9 @@ import java.util.concurrent.Executor;
  */
 public final class HotspotMonitorService extends Service {
     private static final String TAG = "TaskerHotspotMonitor";
-    private static final String CHANNEL = "tasker_tether_state";
+    // A new channel ID is necessary: Android does not allow an app to change
+    // the importance or sound settings of an already-created channel.
+    private static final String CHANNEL = "tasker_tether_state_quiet_v2";
     private static final int NOTIFICATION = 1824;
     private static final String PREFS = "hotspot_monitor_prefs";
     private static final String ENABLED = "enabled";
@@ -511,8 +513,15 @@ public final class HotspotMonitorService extends Service {
 
     private void ensureChannel() {
         if (Build.VERSION.SDK_INT >= 26) {
+            // Foreground services must use IMPORTANCE_LOW or higher. MIN can
+            // cause Android to display an additional higher-priority warning.
             NotificationChannel channel = new NotificationChannel(CHANNEL,
                     getString(R.string.monitor_channel), NotificationManager.IMPORTANCE_LOW);
+            channel.setDescription("Silent ongoing hotspot monitoring for Tasker profiles");
+            channel.setSound(null, null);
+            channel.enableVibration(false);
+            channel.enableLights(false);
+            channel.setShowBadge(false);
             NotificationManager notificationManager =
                     (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (notificationManager != null) notificationManager.createNotificationChannel(channel);
@@ -534,6 +543,11 @@ public final class HotspotMonitorService extends Service {
                 .setSmallIcon(R.mipmap.ic_tethering)
                 .setContentTitle(getString(R.string.monitor_channel))
                 .setContentText(message)
+                .setCategory(Notification.CATEGORY_SERVICE)
+                .setOnlyAlertOnce(true)
+                .setShowWhen(false)
+                .setPriority(Notification.PRIORITY_LOW)
+                .setDefaults(0)
                 .setOngoing(true)
                 .addAction(android.R.drawable.ic_menu_close_clear_cancel,
                         getString(R.string.monitor_stop), stopIntent)
