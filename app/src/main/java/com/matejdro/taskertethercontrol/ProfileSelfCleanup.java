@@ -7,6 +7,7 @@ import android.content.pm.LauncherUserInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Process;
+import android.os.Parcel;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.util.Log;
@@ -75,9 +76,11 @@ final class ProfileSelfCleanup {
         int found = 0;
         int removed = 0;
         int failures = 0;
-        int ownUserId = Process.myUserHandle().getIdentifier();
+        // The caller passed UserManager.isSystemUser(), so the only eligible
+        // initiating user is Android's primary system user (user 0).
+        int ownUserId = 0;
         for (UserHandle handle : handles) {
-            int id = handle.getIdentifier();
+            int id = verifiedUserId(handle);
             if (id <= 0 || id == ownUserId) continue;
             LauncherUserInfo info;
             try {
@@ -117,6 +120,28 @@ final class ProfileSelfCleanup {
         record(context, "Verified clone copies: " + found +
                 "; removed: " + removed + "; failed: " + failures +
                 (found == 0 ? " (nothing to remove)" : ""));
+    }
+
+    /**
+     * UserHandle.getIdentifier() is a hidden SystemApi on Android 15.
+     * Its publicly exposed Parcelable representation stores the numeric ID;
+     * validate a full round-trip and fail closed if the representation changes.
+     */
+    private static int verifiedUserId(UserHandle handle) {
+        Parcel parcel = Parcel.obtain();
+        try {
+            handle.writeToParcel(parcel, 0);
+            parcel.setDataPosition(0);
+            int userId = parcel.readInt();
+            parcel.setDataPosition(0);
+            UserHandle roundTrip = UserHandle.readFromParcel(parcel);
+            return handle.equals(roundTrip) ? userId : -1;
+        } catch (RuntimeException failure) {
+            Log.w(TAG, "Cannot verify clone user ID", failure);
+            return -1;
+        } finally {
+            parcel.recycle();
+        }
     }
 
     /** 'pm uninstall --user' changes only the supplied user installation. */
