@@ -1,0 +1,66 @@
+name: Archive signed Tasker Tether Control v1.4.12
+
+# One-time manual archive triggered only by the dedicated archival branch.
+on:
+  push:
+    branches: [apk-archive-v1.4.12]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  archive-signed-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out one-time archive recipe
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download unsigned APK from successful build #12
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/tasker-apk-unsigned
+          gh run download 38194097553 \
+            --repo "$GITHUB_REPOSITORY" \
+            --name TaskerTetherControl-unsigned-intermediate \
+            --dir /tmp/tasker-apk-unsigned
+          test -s /tmp/tasker-apk-unsigned/TaskerTetherControl-unsigned.apk
+          echo "Matching unsigned APK downloaded."
+
+      - name: Reconstruct original signed APK (private key never required)
+        run: |
+          set -euo pipefail
+          python3 .github/apk-archive/reconstruct.py \
+            /tmp/tasker-apk-unsigned/TaskerTetherControl-unsigned.apk \
+            .github/apk-archive/v1.4.12-signature-bundle.base64 \
+            /tmp/TaskerTetherControl-v1.4.12.apk
+
+      - name: Verify exact APK, Java signature and signing certificate
+        run: |
+          set -euo pipefail
+          apk=/tmp/TaskerTetherControl-v1.4.12.apk
+          echo "1007896134fdb558e552fd35d75870ad6db5d8ebf1b8603b333a32d19fc96cd3  $apk" | sha256sum -c -
+          unzip -t "$apk" >/dev/null
+          jarsigner -verify "$apk"
+          cert="$(keytool -printcert -jarfile "$apk" | grep -m1 ' SHA256:' | sed 's/.*SHA256: //' | tr -d ':' | tr 'A-F' 'a-f')"
+          test "$cert" = "01d3dc30858c351b650d4a0be379cf708f52f3a3efdb87f6e3cc3fbe3deea367"
+          echo "Exact signed APK verified."
+
+      - name: Commit verified signed APK to master
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin master
+          git switch -C master origin/master
+          mkdir -p releases
+          cp /tmp/TaskerTetherControl-v1.4.12.apk releases/TaskerTetherControl-v1.4.12.apk
+          git add releases/TaskerTetherControl-v1.4.12.apk
+          git commit -m 'Archive signed Tasker Tether Control v1.4.12 APK'
+          git push origin HEAD:master
+          echo "Signed APK committed to master successfully."
