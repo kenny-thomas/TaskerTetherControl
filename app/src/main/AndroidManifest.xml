@@ -31,6 +31,15 @@
             </intent-filter>
         </receiver>
         <activity
+            android:name=".MonitorDiagnosticsActivity"
+            android:exported="true"
+            android:label="Tethering Diagnostics">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <activity
             android:name=".TetherConditionActivity"
             android:exported="true"
             android:label="@string/condition_title">

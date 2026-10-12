@@ -32,10 +32,18 @@ public final class TetherConditionReceiver extends BroadcastReceiver {
         // Query only uses in-memory state from an active callback listener.
         // Never interpret missing permission / stopped service as hotspot off.
         HotspotMonitorService.Snapshot state = HotspotMonitorService.snapshot();
+        // A query can arrive before the foreground service starts or receives
+        // the initial broadcast. Attempt an immediate read where Android allows it.
+        // Missing access is UNKNOWN, not an incorrect "hotspot disabled".
+        if (state.hotspotEnabled == null) {
+            Boolean initial = HotspotMonitorService.queryHotspotNow(context);
+            if (initial != null) {
+                state = new HotspotMonitorService.Snapshot(
+                        true, initial, initial ? state.clients : 0);
+            }
+        }
         if (!state.registered) {
             HotspotMonitorService.enableAndStart(context);
-            setResultCode(LocaleConstants.RESULT_CONDITION_UNKNOWN);
-            return;
         }
 
         Boolean satisfied = null;

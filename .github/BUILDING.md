@@ -131,3 +131,29 @@ client aggregation, which is implemented but not hardware verified.
 
 Note that the pre-existing Android 15 tethering ACTION implementation
 uses reflection and still requires live-device verification.
+
+## Hotspot state reliability fix and diagnostics (v1.4.4)
+
+The initial monitoring code incorrectly treated a failed privileged
+`registerSoftApCallback` call as a total monitoring failure. Now the
+service registers for `android.net.wifi.WIFI_AP_STATE_CHANGED` independently
+of the privileged callback; its `wifi_state` values identify hotspot
+enabled/disabled. `WifiManager.getWifiApState` is also attempted for an
+initial immediate snapshot; if hidden-API restrictions block it, results
+remain UNKNOWN until an actual broadcast arrives.
+
+**Connected clients** still require the SoftAP system callback and the
+`NETWORK_SETTINGS` permission. If the callback cannot be registered,
+client states are UNKNOWN while hotspot on/off profiles may still work.
+No ambiguous data is converted to false.
+
+The app now offers a launcher activity named **Tethering Diagnostics**.
+Open it to view current hotspot state, connected clients, whether the
+privileged permission is granted, last callback error, and state source.
+Use **Start / retry monitoring**, then **Refresh status**. Tapping the
+ongoing monitor notification also opens diagnostics; the screen has a
+**Copy diagnostics** button to share the status text.
+
+If monitoring remains unavailable, report the copied diagnostics; a
+GitHub CI build cannot verify the device-specific SoftAP permissions,
+hidden API behavior, or Magisk overlay state.
