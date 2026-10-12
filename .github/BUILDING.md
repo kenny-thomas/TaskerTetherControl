@@ -157,3 +157,23 @@ ongoing monitor notification also opens diagnostics; the screen has a
 If monitoring remains unavailable, report the copied diagnostics; a
 GitHub CI build cannot verify the device-specific SoftAP permissions,
 hidden API behavior, or Magisk overlay state.
+
+## Force reinstall Magisk module (v1.4.6)
+
+The plugin action editor previously hid its **Install using Magisk**
+button once Android reported `TETHER_PRIVILEGED` granted. That prevented
+reinstallation following a module removal/upgrade. The button is now
+always visible when Modify System Settings is granted, and a dedicated
+**Force Reinstall Magisk Module** button is always accessible from the
+**Tethering Diagnostics** launcher activity, regardless of current
+privileged permissions.
+
+Both controls ask for confirmation, call the same root Magisk module
+installer, and package the currently installed APK plus privileged
+permission XML. The installer does not remount `/system`; reboot to apply
+a successful install/replace. If a module is pending removal, check its
+state in Magisk before attempting to replace it.
+
+Updating the APK alone does **not** update the APK embedded in Magisk's
+systemless module. Use the dedicated reinstall button after each APK
+update that changes requested privileged permissions.

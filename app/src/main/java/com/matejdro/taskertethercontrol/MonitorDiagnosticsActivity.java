@@ -50,6 +50,11 @@ public final class MonitorDiagnosticsActivity extends Activity {
         });
         panel.addView(restart);
 
+        Button reinstall = new Button(this);
+        reinstall.setText(R.string.force_reinstall_magisk_module);
+        reinstall.setOnClickListener(v -> showReinstallConfirmation());
+        panel.addView(reinstall);
+
         Button copy = new Button(this);
         copy.setText("Copy diagnostics");
         copy.setOnClickListener(v -> {
@@ -77,6 +82,16 @@ public final class MonitorDiagnosticsActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (status != null) refresh();
+    }
+
+    private void showReinstallConfirmation() {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(R.string.magisk_install_confirm_title)
+                .setMessage(R.string.magisk_install_confirm_text)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.magisk_install_confirm_button,
+                        (dialog, which) -> new SystemInstallTask(this).execute((Void[]) null))
+                .show();
     }
 
     private void refresh() {

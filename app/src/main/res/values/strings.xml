@@ -4,7 +4,7 @@
     <string name="plugin_action">Plugin action:</string>
     <string name="no_system_warning">If tethering fails due to missing privileged permissions, you can install a systemless Magisk module. This requires Magisk, root approval, and a reboot. Android 15 tethering compatibility is not guaranteed.</string>
     <string name="no_settings_permission_warning">Plugin will not work without app being granted system settings permission.</string>
-    <string name="install_app_to_the_system">Install using Magisk</string>
+    <string name="install_app_to_the_system">Install / reinstall Magisk module</string>
     <string name="open_settings">Open settings</string>
 
     <string name="unknown_error">Unknown error</string>
@@ -16,9 +16,9 @@
     <string name="error_no_settings_permission">No \"modify system settings\" permission. Open config dialog.\n\n</string>
     <string name="error_root_needed">Privileged tethering permission may be required. Open config dialog for Magisk setup.\n\n</string>
     <string name="magisk_missing">Magisk root is required. This installer will not remount or write to /system. If you use KernelSU or another root provider, this version does not support its module installer.</string>
-    <string name="magisk_install_confirm_title">Install Magisk module?</string>
-    <string name="magisk_install_confirm_text">This will stage a systemless privileged-app module using Magisk, not modify the read-only system partition. A reboot is required. A module can interfere with boot or system permissions; you can disable it in Magisk. It does not guarantee that the 2017 tethering method works on Android 15.</string>
-    <string name="magisk_install_confirm_button">Install module</string>
+    <string name="magisk_install_confirm_title">Install or replace Magisk module?</string>
+    <string name="magisk_install_confirm_text">This will install or replace the Tasker Tether Control Magisk module with the currently installed APK and updated permissions. It does not modify the read-only system partition. Reboot after installation. Review the Magisk module list if an installation fails; systemless privileged modules can affect device startup.</string>
+    <string name="magisk_install_confirm_button">Install / replace</string>
     <string name="magisk_install_progress">Installing systemless Magisk module…</string>
     <string name="magisk_install_timeout">The Magisk command timed out. Check root approval in Magisk and retry.</string>
     <string name="condition_title">Tethering States</string>
@@ -33,4 +33,5 @@
     <string name="monitor_running">Hotspot monitor</string>
     <string name="monitor_unavailable">Hotspot monitoring unavailable.</string>
     <string name="monitor_stop">Stop monitoring</string>
+    <string name="force_reinstall_magisk_module">Force Reinstall Magisk Module</string>
 </resources>

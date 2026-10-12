@@ -71,8 +71,12 @@ public class TetherSetupActivity extends TaskerSetupActivity {
 
             fixPermissionButton.setText(R.string.install_app_to_the_system);
         } else {
+            // Keep the reinstall action visible even when Android reports that
+            // TETHER_PRIVILEGED is granted. This permission can remain granted
+            // while the Magisk module needs replacing with a newer APK.
             warningView.setVisibility(View.GONE);
-            fixPermissionButton.setVisibility(View.GONE);
+            fixPermissionButton.setVisibility(View.VISIBLE);
+            fixPermissionButton.setText(R.string.force_reinstall_magisk_module);
         }
 
     }
