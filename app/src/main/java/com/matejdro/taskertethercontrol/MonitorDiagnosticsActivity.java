@@ -88,7 +88,11 @@ public final class MonitorDiagnosticsActivity extends Activity {
                 "Connected-client monitoring additionally requires privileged Wi-Fi access. " +
                 "If NETWORK_SETTINGS is not granted, update the Magisk module and reboot. " +
                 "Tap this app's monitor notification to reopen diagnostics. " +
-                "If state remains UNKNOWN, copy these diagnostics for troubleshooting.");
+                "For Tasker profile activation, check that recheck requests and " +
+                "host condition queries both increment after toggling the hotspot. " +
+                "If queries never increase, make sure Tasker monitoring is enabled " +
+                "and re-add the plugin State in Tasker. " +
+                "Copy diagnostics if the problem remains.");
         panel.addView(help);
 
         scroller.addView(panel);
@@ -124,6 +128,8 @@ public final class MonitorDiagnosticsActivity extends Activity {
                 "Android: " + android.os.Build.VERSION.RELEASE +
                 " (API " + android.os.Build.VERSION.SDK_INT + ")\n\n" +
                 HotspotMonitorService.diagnostics(this) +
+                "\n\nTasker condition transport:\n" +
+                TaskerQueryDiagnostics.describe(this) +
                 "\n\nLast recorded app crash:\n" +
                 TetherApplication.getCrashReport(this));
     }

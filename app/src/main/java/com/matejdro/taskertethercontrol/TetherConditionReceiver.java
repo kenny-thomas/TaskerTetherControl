@@ -25,6 +25,8 @@ public final class TetherConditionReceiver extends BroadcastReceiver {
                 !LocaleConstants.ACTION_QUERY_CONDITION.equals(intent.getAction())) return;
         Bundle options = intent.getBundleExtra(LocaleConstants.EXTRA_BUNDLE);
         if (options == null) {
+            TaskerQueryDiagnostics.queried(context, -1,
+                    LocaleConstants.RESULT_CONDITION_UNKNOWN, "Missing Locale options bundle");
             setResultCode(LocaleConstants.RESULT_CONDITION_UNKNOWN);
             return;
         }
@@ -72,9 +74,15 @@ public final class TetherConditionReceiver extends BroadcastReceiver {
                 Log.w(TAG, "Unknown state condition " + mode);
         }
 
-        setResultCode(satisfied == null
+        int result = satisfied == null
                 ? LocaleConstants.RESULT_CONDITION_UNKNOWN
                 : (satisfied ? LocaleConstants.RESULT_CONDITION_SATISFIED
-                             : LocaleConstants.RESULT_CONDITION_UNSATISFIED));
+                             : LocaleConstants.RESULT_CONDITION_UNSATISFIED);
+        TaskerQueryDiagnostics.queried(context, mode, result,
+                "hotspot=" + state.hotspotEnabled + ", clients=" + state.clients +
+                ", serviceRegistered=" + state.registered);
+        Log.i(TAG, "Tasker queried condition=" + mode + " result=" + result +
+                " hotspot=" + state.hotspotEnabled + " clients=" + state.clients);
+        setResultCode(result);
     }
 }

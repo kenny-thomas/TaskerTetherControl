@@ -198,3 +198,29 @@ other application processes.
 If repeated app exits persist, capture `adb logcat -b crash -d`
 immediately afterward. A successful compile alone cannot establish
 device-specific crash recovery.
+
+## Tasker Profile state recheck delivery (v1.4.11)
+
+Android tethering events may be correctly detected in **Tethering Diagnostics**
+but never activate Tasker if the host never receives
+`com.twofortyfouram.locale.intent.action.REQUEST_QUERY`.
+When Tasker (package `net.dinglisch.android.taskerm`, or the older direct
+purchase package `net.dinglisch.android.tasker`) is installed, send the
+request with `Intent.setPackage()` to make it package-targeted. When
+neither package is installed, preserve the original implicit broadcast
+for other Locale-compatible hosts.
+
+The plugin still responds to Tasker's explicit ordered
+`ACTION_QUERY_CONDITION` broadcasts with Locale result codes 16, 17 or 18.
+The configuration activity continues to save the condition-mode bundle.
+
+**Diagnostics** now persists the number/timestamp of REQUEST_QUERY sends,
+the routing package, number/timestamp of actual Tasker QUERY_CONDITION
+receives, last mode and result code. **Sent broadcasts are not delivery
+acknowledgements**: compare both counters while changing the hotspot.
+If host queries stay at zero, verify Tasker itself is enabled and that
+the profile uses **State > Plugin**, not Event. If host queries increase
+but result code disagrees with the current hotspot state, inspect
+the last query mode/bundle and report the diagnostics.
+
+Reinstalling Magisk does not affect Tasker condition recheck delivery.

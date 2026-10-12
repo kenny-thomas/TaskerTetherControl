@@ -459,14 +459,48 @@ public final class HotspotMonitorService extends Service {
     }
 
     private void requestTaskerRequery() {
-        // A profile re-query must never be able to crash the monitoring process.
-        try {
-            Intent event = new Intent(LocaleConstants.ACTION_REQUEST_QUERY);
-            event.putExtra(LocaleConstants.EXTRA_STRING_ACTIVITY_CLASS_NAME,
-                    TetherConditionActivity.class.getName());
-            sendBroadcast(event);
-        } catch (RuntimeException | LinkageError error) {
-            recordMonitorError("Requesting Tasker condition recheck", error);
+        // Tasker usually receives a condition recheck via a manifest receiver.
+        // On Android 8+, that receiver may not receive an implicit broadcast.
+        // Explicitly target the installed Tasker package, while continuing to
+        // support other Locale-compatible hosts via the normal implicit action.
+        final String[] taskerPackages = {
+                "net.dinglisch.android.taskerm",
+                "net.dinglisch.android.tasker"
+        };
+        boolean sentToTasker = false;
+        for (String taskerPackage : taskerPackages) {
+            try {
+                getPackageManager().getPackageInfo(taskerPackage, 0);
+            } catch (android.content.pm.PackageManager.NameNotFoundException notInstalled) {
+                continue;
+            } catch (RuntimeException error) {
+                recordMonitorError("Finding Tasker package", error);
+                continue;
+            }
+            try {
+                Intent event = new Intent(LocaleConstants.ACTION_REQUEST_QUERY);
+                event.putExtra(LocaleConstants.EXTRA_STRING_ACTIVITY_CLASS_NAME,
+                        TetherConditionActivity.class.getName());
+                event.setPackage(taskerPackage);
+                sendBroadcast(event);
+                TaskerQueryDiagnostics.sent(this, taskerPackage);
+                Log.i(TAG, "Sent Tasker condition recheck to " + taskerPackage);
+                sentToTasker = true;
+            } catch (RuntimeException | LinkageError error) {
+                recordMonitorError("Sending Tasker recheck to " + taskerPackage, error);
+            }
+        }
+        if (!sentToTasker) {
+            try {
+                Intent event = new Intent(LocaleConstants.ACTION_REQUEST_QUERY);
+                event.putExtra(LocaleConstants.EXTRA_STRING_ACTIVITY_CLASS_NAME,
+                        TetherConditionActivity.class.getName());
+                sendBroadcast(event);
+                TaskerQueryDiagnostics.sent(this, "implicit Locale/Tasker");
+                Log.i(TAG, "Sent implicit condition recheck");
+            } catch (RuntimeException | LinkageError error) {
+                recordMonitorError("Sending implicit condition recheck", error);
+            }
         }
     }
 
