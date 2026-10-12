@@ -78,3 +78,22 @@ A modern Pixel 9 does not permit the 2017 style writable-system APK
 installation. This fix only handles the installation workflow, not the
 private tethering APIs used by `TaskerReceiver`. Android 15 runtime
 functionality still needs physical-device validation.
+
+## Android 15 tethering receiver (experimental)
+
+`TaskerReceiver` uses `android.net.TetheringManager` on Android 11+ rather
+than the removed `android.net.IConnectivityManager.startTethering` signature.
+On Android 15 the API is present at runtime but was not exposed by the
+public API 35 SDK. The implementation uses guarded reflection and a
+callback proxy, and may be affected by hidden API enforcement or OEM API
+differences. If reflection is blocked, Tasker gets an explicit failure and
+a reason; it no longer reports success before asynchronous tethering completes.
+
+The Tasker/Locale broadcast uses `goAsync()`, an approximately 5.5 second
+timeout, and returns a proper result code and `%errmsg` error variable.
+Stopping uses the compatible `TetheringManager.stopTethering(int)` call
+with acknowledgement that this older API has no completion callback.
+
+Test **both** Enable and Disable on the actual Pixel 9 / Android 15 with
+the updated Magisk module active. APK compilation cannot validate device
+permissions, hidden APIs, or carrier entitlement.
