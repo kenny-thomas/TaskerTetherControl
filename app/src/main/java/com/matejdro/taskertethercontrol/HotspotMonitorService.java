@@ -66,6 +66,9 @@ public final class HotspotMonitorService extends Service {
     private static volatile String LAST_ERROR = "No monitor error";
     private static volatile String STATE_SOURCE = "none";
     private static volatile String CLIENT_SOURCE = "none";
+    private static volatile String TETHER_EVENT_STATUS = "not started";
+    private TetherEventObserver tetherEvents;
+    private boolean authoritativeTetherState;
 
     static String diagnostics(Context context) {
         Snapshot s = CURRENT;
@@ -75,10 +78,12 @@ public final class HotspotMonitorService extends Service {
                 "\nConnected clients: " + (s.clients == null ? "UNKNOWN" : s.clients) +
                 "\nHotspot state source: " + STATE_SOURCE +
                 "\nClients source: " + CLIENT_SOURCE +
+                "\nTethering events: " + TETHER_EVENT_STATUS +
                 "\nNETWORK_SETTINGS: " +
                     (permission == android.content.pm.PackageManager.PERMISSION_GRANTED ? "GRANTED" : "NOT GRANTED") +
                 "\nLast monitor error: " + LAST_ERROR +
-                "\nIf NETWORK_SETTINGS is missing, reinstall the updated Magisk module and reboot.";
+                "\nNETWORK_SETTINGS is signature-only; Magisk cannot grant it." +
+                "\nTethering events use ACCESS_NETWORK_STATE instead.";
     }
 
     /**
@@ -110,6 +115,7 @@ public final class HotspotMonitorService extends Service {
         @Override
         public void onReceive(Context context, Intent event) {
             if (event == null || !AP_STATE_CHANGED.equals(event.getAction())) return;
+            if (authoritativeTetherState) return;
             int mode = event.getIntExtra(AP_MODE_EXTRA, -1);
             if (mode != -1 && mode != AP_MODE_TETHERED) return;
             int state = event.getIntExtra(AP_STATE_EXTRA, -1);
@@ -214,24 +220,102 @@ public final class HotspotMonitorService extends Service {
                 catch (Exception e) { Log.w(TAG, "Unable to unregister old callback", e); }
             }
             callback = null;
+            if (tetherEvents != null) {
+                try { tetherEvents.close(); }
+                catch (Exception e) { Log.w(TAG, "Closing tether events failed", e); }
+                tetherEvents = null;
+            }
+            authoritativeTetherState = false;
             callbackAttempted = false;
         }
         if (!callbackAttempted) {
             callbackAttempted = true;
             try {
-                startObservation();
-                CLIENT_SOURCE = "WifiManager SoftApCallback";
+                tetherEvents = new TetherEventObserver(this, new TetherEventObserver.Listener() {
+                    @Override public void onInterfaces(java.util.Collection<?> interfaces) {
+                        onTetherInterfaces(interfaces);
+                    }
+                    @Override public void onClients(java.util.Collection<?> clients) {
+                        onTetherClients(clients);
+                    }
+                    @Override public void onError(Throwable failure) {
+                        recordMonitorError("Tethering event", failure);
+                    }
+                });
+                TETHER_EVENT_STATUS = "registered; awaiting events";
                 LAST_ERROR = "No monitor error";
+            } catch (Throwable e) {
+                TETHER_EVENT_STATUS = e.getClass().getSimpleName() + ": " + e.getMessage();
+                Log.w(TAG, "TetheringManager callback unavailable", e);
+            }
+            try {
+                if (tetherEvents == null) startObservation();
+                else CLIENT_SOURCE = "awaiting TetheringManager client callback";
+                if (tetherEvents == null) LAST_ERROR = "No monitor error";
             } catch (Throwable error) {
                 Log.e(TAG, "Client monitoring unavailable; hotspot broadcast listener remains active", error);
-                CLIENT_SOURCE = "unavailable";
-                LAST_ERROR = "Client callback: " + error.toString();
+                if (tetherEvents == null) CLIENT_SOURCE = "unavailable";
+                LAST_ERROR = "Wi-Fi privileged callback unavailable: " + error.toString();
                 updateNotification(getString(R.string.monitor_unavailable) + " " +
                         error.getClass().getSimpleName() + " (see Diagnostics)");
                 requestTaskerRequery();
             }
         }
         return START_STICKY;
+    }
+
+    /**
+     * Prefer TetheringManager's typed tethered-interface callback to
+     * WIFI_AP_STATE_CHANGED, which can report local-only AP state on Pixels.
+     */
+    private void onTetherInterfaces(java.util.Collection<?> interfaces) {
+        if (interfaces == null) return;
+        boolean wifiActive = false;
+        for (Object item : interfaces) {
+            if (item == null) continue;
+            try {
+                int type;
+                if (item instanceof String) {
+                    String name = (String) item;
+                    if (name.startsWith("wlan") || name.startsWith("ap") ||
+                            name.startsWith("swlan")) wifiActive = true;
+                    continue;
+                } else {
+                    Object value = item.getClass().getMethod("getType").invoke(item);
+                    type = ((Number) value).intValue();
+                }
+                if (type == 0) wifiActive = true; // TETHERING_WIFI
+            } catch (Exception failure) {
+                recordMonitorError("Decoding tethered interface", failure);
+                return; // don't turn a decode error into false OFF
+            }
+        }
+        authoritativeTetherState = true;
+        TETHER_EVENT_STATUS = "active: tethered interfaces received";
+        STATE_SOURCE = "TetheringManager tethered-interface callback";
+        onStateChanged(wifiActive ? AP_ENABLED : AP_DISABLED);
+    }
+
+    private void onTetherClients(java.util.Collection<?> clients) {
+        if (clients == null) return;
+        int count = 0;
+        for (Object client : clients) {
+            if (client == null) continue;
+            try {
+                Object value = client.getClass().getMethod("getTetheringType").invoke(client);
+                if (((Number) value).intValue() == 0) count++;
+            } catch (Exception failure) {
+                recordMonitorError("Decoding tethered client", failure);
+                return;
+            }
+        }
+        Snapshot old = CURRENT;
+        aggregateClients = count;
+        clientsByInstance.clear();
+        CLIENT_SOURCE = "TetheringManager client callback (DHCP leases)";
+        CURRENT = new Snapshot(true, old.hotspotEnabled,
+                Boolean.FALSE.equals(old.hotspotEnabled) ? 0 : count);
+        onNewSnapshot(old);
     }
 
     private void startObservation() throws Exception {
@@ -318,7 +402,7 @@ public final class HotspotMonitorService extends Service {
             aggregateClients = null;
         }
         Integer count = Boolean.FALSE.equals(enabled) ? 0
-                : (callback == null ? null : getClientCount());
+                : (callback == null && tetherEvents == null ? null : getClientCount());
         CURRENT = new Snapshot(broadcastRegistered || callback != null, enabled, count);
         onNewSnapshot(before);
     }
@@ -423,6 +507,12 @@ public final class HotspotMonitorService extends Service {
 
     @Override
     public void onDestroy() {
+        if (tetherEvents != null) {
+            try { tetherEvents.close(); }
+            catch (Exception error) { Log.w(TAG, "Tether event unregister failed", error); }
+            tetherEvents = null;
+        }
+        authoritativeTetherState = false;
         if (broadcastRegistered) {
             try { unregisterReceiver(hotspotReceiver); }
             catch (RuntimeException e) { Log.w(TAG, "Unregister broadcast failed", e); }
