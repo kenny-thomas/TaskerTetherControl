@@ -27,7 +27,7 @@
     <string name="condition_hotspot_off">Hotspot disabled</string>
     <string name="condition_clients_on">One or more devices connected</string>
     <string name="condition_clients_off">No devices connected</string>
-    <string name="condition_help">A persistent notification keeps the hotspot listener running. Magisk installation and reboot may be needed for NETWORK_SETTINGS permission. Press Back to save the State. Stop monitoring from the notification if not needed.</string>
+    <string name="condition_help">A persistent notification keeps the hotspot listener running. TetheringManager callbacks are used for detection; on some devices Android may restrict these APIs. Press Back to save. Stop monitoring from the notification when not needed.</string>
     <string name="monitor_channel">Tasker tethering states</string>
     <string name="monitor_initializing">Waiting for hotspot state</string>
     <string name="monitor_running">Hotspot monitor</string>
