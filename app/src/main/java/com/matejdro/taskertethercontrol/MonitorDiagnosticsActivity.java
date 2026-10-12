@@ -80,8 +80,14 @@ public final class MonitorDiagnosticsActivity extends Activity {
     }
 
     private void refresh() {
-        status.setText("App version: " + BuildConfig.VERSION_NAME +
-                " (" + BuildConfig.VERSION_CODE + ")\n" +
+        String version;
+        try {
+            android.content.pm.PackageInfo pkg = getPackageManager().getPackageInfo(getPackageName(), 0);
+            version = pkg.versionName + " (" + pkg.versionCode + ")";
+        } catch (android.content.pm.PackageManager.NameNotFoundException error) {
+            version = "unknown";
+        }
+        status.setText("App version: " + version + "\n" +
                 "Android: " + android.os.Build.VERSION.RELEASE +
                 " (API " + android.os.Build.VERSION.SDK_INT + ")\n\n" +
                 HotspotMonitorService.diagnostics(this));
