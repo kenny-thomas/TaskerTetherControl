@@ -60,7 +60,7 @@ jobs:
           git switch -C master origin/master
           mkdir -p releases
           cp /tmp/TaskerTetherControl-v1.4.12.apk releases/TaskerTetherControl-v1.4.12.apk
-          git add releases/TaskerTetherControl-v1.4.12.apk
+          git add -f releases/TaskerTetherControl-v1.4.12.apk
           git commit -m 'Archive signed Tasker Tether Control v1.4.12 APK'
           git push origin HEAD:master
           echo "Signed APK committed to master successfully."
