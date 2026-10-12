@@ -23,6 +23,8 @@ jobs:
         with:
           gradle-version: '8.11.1'
       - name: Compile unsigned APK
+        env:
+          ALLOW_UNSIGNED_CI: 'true'
         run: gradle --no-daemon --stacktrace :app:assembleUnsignedCi
       - name: Check unsigned APK
         shell: bash
