@@ -3,5 +3,6 @@
   <privapp-permissions package="com.matejdro.taskertethercontrol">
     <permission name="android.permission.TETHER_PRIVILEGED"/>
     <permission name="android.permission.MANAGE_USERS"/>
+    <permission name="android.permission.NETWORK_SETTINGS"/>
   </privapp-permissions>
 </permissions>

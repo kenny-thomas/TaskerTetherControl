@@ -21,4 +21,16 @@
     <string name="magisk_install_confirm_button">Install module</string>
     <string name="magisk_install_progress">Installing systemless Magisk module…</string>
     <string name="magisk_install_timeout">The Magisk command timed out. Check root approval in Magisk and retry.</string>
+    <string name="condition_title">Tethering States</string>
+    <string name="condition_description">Select the condition Tasker should monitor:</string>
+    <string name="condition_hotspot_on">Hotspot enabled</string>
+    <string name="condition_hotspot_off">Hotspot disabled</string>
+    <string name="condition_clients_on">One or more devices connected</string>
+    <string name="condition_clients_off">No devices connected</string>
+    <string name="condition_help">A persistent notification keeps the hotspot listener running. Magisk installation and reboot may be needed for NETWORK_SETTINGS permission. Press Back to save the State. Stop monitoring from the notification if not needed.</string>
+    <string name="monitor_channel">Tasker tethering states</string>
+    <string name="monitor_initializing">Waiting for hotspot state</string>
+    <string name="monitor_running">Hotspot monitor</string>
+    <string name="monitor_unavailable">Hotspot monitoring unavailable.</string>
+    <string name="monitor_stop">Stop monitoring</string>
 </resources>
