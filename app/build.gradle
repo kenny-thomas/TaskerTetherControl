@@ -6,7 +6,9 @@ def signingPassword = System.getenv('APK_KEYSTORE_PASSWORD')
 def signingAlias = System.getenv('APK_KEY_ALIAS')
 def signingKeyPassword = System.getenv('APK_KEY_PASSWORD')
 def hasCiSigner = signingPath && signingPassword && signingAlias && signingKeyPassword
-if (System.getenv('CI') == 'true' && !hasCiSigner) {
+def explicitUnsignedCompile = System.getenv('ALLOW_UNSIGNED_CI') == 'true' &&
+        gradle.startParameter.taskNames == [':app:assembleUnsignedCi']
+if (System.getenv('CI') == 'true' && !hasCiSigner && !explicitUnsignedCompile) {
     throw new GradleException('CI builds require a persistent signing keystore; refusing an ephemeral debug key.')
 }
 
