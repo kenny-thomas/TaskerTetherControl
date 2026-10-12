@@ -65,6 +65,24 @@ public final class MonitorDiagnosticsActivity extends Activity {
         });
         panel.addView(copy);
 
+        Button copyCrash = new Button(this);
+        copyCrash.setText("Copy last crash report");
+        copyCrash.setOnClickListener(v -> {
+            ClipboardManager clipboard = (ClipboardManager)
+                    getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard != null) clipboard.setPrimaryClip(ClipData.newPlainText(
+                    "Tasker Tether Control last crash", TetherApplication.getCrashReport(this)));
+        });
+        panel.addView(copyCrash);
+
+        Button clearCrash = new Button(this);
+        clearCrash.setText("Clear saved crash report");
+        clearCrash.setOnClickListener(v -> {
+            TetherApplication.clearCrashReport(this);
+            refresh();
+        });
+        panel.addView(clearCrash);
+
         TextView help = new TextView(this);
         help.setText("\nHotspot state uses Android state-change broadcasts. " +
                 "Connected-client monitoring additionally requires privileged Wi-Fi access. " +
@@ -105,6 +123,8 @@ public final class MonitorDiagnosticsActivity extends Activity {
         status.setText("App version: " + version + "\n" +
                 "Android: " + android.os.Build.VERSION.RELEASE +
                 " (API " + android.os.Build.VERSION.SDK_INT + ")\n\n" +
-                HotspotMonitorService.diagnostics(this));
+                HotspotMonitorService.diagnostics(this) +
+                "\\n\\nLast recorded app crash:\\n" +
+                TetherApplication.getCrashReport(this));
     }
 }

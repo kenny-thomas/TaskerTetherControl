@@ -11,6 +11,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <application
+        android:name=".TetherApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_tethering"
         android:label="@string/toggle_tethering"

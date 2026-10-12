@@ -177,3 +177,24 @@ state in Magisk before attempting to replace it.
 Updating the APK alone does **not** update the APK embedded in Magisk's
 systemless module. Use the dedicated reinstall button after each APK
 update that changes requested privileged permissions.
+
+## Android 15 app crash resilience (v1.4.7)
+
+The monitor's `startForeground()` used to throw unhandled exceptions,
+potentially creating a crash loop whenever Tasker requested a state or
+the boot receiver restarted monitoring. It now catches foreground
+service errors, disables automatic monitoring until user retry, and
+records the reason for diagnosis. Hotspot callback processing, Tasker
+requery broadcasts and notification updates also catch runtime failures.
+
+A new `TetherApplication` saves the last uncaught Java exception to
+private on-device preferences for diagnosis, then allows the ordinary
+Android crash handler to run. Nothing is uploaded automatically.
+Open **Tethering Diagnostics** and use **Copy last crash report** to
+share the captured failure, or clear it from the same screen. This
+will not capture native crashes, Android system kills, or crashes of
+other application processes.
+
+If repeated app exits persist, capture `adb logcat -b crash -d`
+immediately afterward. A successful compile alone cannot establish
+device-specific crash recovery.
