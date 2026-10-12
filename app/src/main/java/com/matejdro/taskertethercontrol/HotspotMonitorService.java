@@ -7,6 +7,8 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.net.wifi.WifiManager;
 import android.os.Build;
@@ -40,6 +42,10 @@ public final class HotspotMonitorService extends Service {
     private static final String PREFS = "hotspot_monitor_prefs";
     private static final String ENABLED = "enabled";
     private static final String ACTION_STOP = "com.matejdro.taskertethercontrol.STOP_MONITOR";
+    private static final String AP_STATE_CHANGED = "android.net.wifi.WIFI_AP_STATE_CHANGED";
+    private static final String AP_STATE_EXTRA = "wifi_state";
+    private static final String AP_MODE_EXTRA = "android.net.wifi.extra.WIFI_AP_MODE";
+    private static final int AP_MODE_TETHERED = 1;
     private static final int AP_ENABLED = 13;
     private static final int AP_DISABLED = 11;
     private static final int AP_FAILED = 14;
@@ -56,11 +62,63 @@ public final class HotspotMonitorService extends Service {
     }
 
     private static volatile Snapshot CURRENT = new Snapshot(false, null, null);
+    private static volatile String LAST_ERROR = "No monitor error";
+    private static volatile String STATE_SOURCE = "none";
+    private static volatile String CLIENT_SOURCE = "none";
+
+    static String diagnostics(Context context) {
+        Snapshot s = CURRENT;
+        int permission = context.checkSelfPermission("android.permission.NETWORK_SETTINGS");
+        return "Hotspot monitoring: " + (s.registered ? "active" : "not started") +
+                "\nHotspot: " + (s.hotspotEnabled == null ? "UNKNOWN" : (s.hotspotEnabled ? "ON" : "OFF")) +
+                "\nConnected clients: " + (s.clients == null ? "UNKNOWN" : s.clients) +
+                "\nHotspot state source: " + STATE_SOURCE +
+                "\nClients source: " + CLIENT_SOURCE +
+                "\nNETWORK_SETTINGS: " +
+                    (permission == android.content.pm.PackageManager.PERMISSION_GRANTED ? "GRANTED" : "NOT GRANTED") +
+                "\nLast monitor error: " + LAST_ERROR +
+                "\nIf NETWORK_SETTINGS is missing, reinstall the updated Magisk module and reboot.";
+    }
+
+    /**
+     * Best-effort initial snapshot for Tasker queries before the foreground
+     * callback delivers its first event. A failed hidden API lookup is UNKNOWN.
+     */
+    static Boolean queryHotspotNow(Context context) {
+        try {
+            WifiManager wifi = (WifiManager) context.getApplicationContext()
+                    .getSystemService(Context.WIFI_SERVICE);
+            if (wifi == null) return null;
+            Method current = WifiManager.class.getMethod("getWifiApState");
+            int state = ((Number) current.invoke(wifi)).intValue();
+            if (state == AP_ENABLED) return true;
+            if (state == AP_DISABLED || state == AP_FAILED) return false;
+        } catch (ReflectiveOperationException | SecurityException e) {
+            Log.d(TAG, "Hidden hotspot state getter not available; waiting for broadcast", e);
+        }
+        return null;
+    }
 
     static Snapshot snapshot() {
         return CURRENT;
     }
 
+    private boolean broadcastRegistered;
+    private boolean callbackAttempted;
+    private final BroadcastReceiver hotspotReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent event) {
+            if (event == null || !AP_STATE_CHANGED.equals(event.getAction())) return;
+            int mode = event.getIntExtra(AP_MODE_EXTRA, -1);
+            if (mode != -1 && mode != AP_MODE_TETHERED) return;
+            int state = event.getIntExtra(AP_STATE_EXTRA, -1);
+            if (state != -1) {
+                STATE_SOURCE = "Android WIFI_AP_STATE_CHANGED broadcast";
+                Log.i(TAG, "Hotspot broadcast state=" + state);
+                onStateChanged(state);
+            }
+        }
+    };
     private Object callback;
     private Method unregister;
     private WifiManager wifi;
@@ -91,6 +149,22 @@ public final class HotspotMonitorService extends Service {
         super.onCreate();
         ensureChannel();
         startForeground(NOTIFICATION, notification(getString(R.string.monitor_initializing)));
+        // Hotspot state broadcasts work separately from the privileged client
+        // callback. Missing NETWORK_SETTINGS must not disable hotspot detection.
+        try {
+            registerReceiver(hotspotReceiver, new IntentFilter(AP_STATE_CHANGED));
+            broadcastRegistered = true;
+            CURRENT = new Snapshot(true, null, null);
+            STATE_SOURCE = "awaiting hotspot broadcast";
+            Boolean initial = queryHotspotNow(this);
+            if (initial != null) {
+                STATE_SOURCE = "WifiManager.getWifiApState initial snapshot";
+                onStateChanged(initial ? AP_ENABLED : AP_DISABLED);
+            }
+        } catch (RuntimeException e) {
+            LAST_ERROR = "Hotspot broadcast registration: " + e.toString();
+            Log.w(TAG, LAST_ERROR, e);
+        }
     }
 
     @Override
@@ -100,18 +174,20 @@ public final class HotspotMonitorService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
-        if (callback != null) return START_STICKY;
-        try {
-            startObservation();
-        } catch (Throwable error) {
-            Log.e(TAG, "Soft AP monitoring unavailable", error);
-            CURRENT = new Snapshot(false, null, null);
-            String message = getString(R.string.monitor_unavailable) + " " +
-                    (error.getCause() == null ? error.getClass().getSimpleName()
-                            : error.getCause().getClass().getSimpleName());
-            updateNotification(message);
-            requestTaskerRequery();
-            // Remain visible so a user can see permission/API errors and disable monitoring.
+        if (!callbackAttempted) {
+            callbackAttempted = true;
+            try {
+                startObservation();
+                CLIENT_SOURCE = "WifiManager SoftApCallback";
+                LAST_ERROR = "No monitor error";
+            } catch (Throwable error) {
+                Log.e(TAG, "Client monitoring unavailable; hotspot broadcast listener remains active", error);
+                CLIENT_SOURCE = "unavailable";
+                LAST_ERROR = "Client callback: " + error.toString();
+                updateNotification(getString(R.string.monitor_unavailable) + " " +
+                        error.getClass().getSimpleName() + " (see Diagnostics)");
+                requestTaskerRequery();
+            }
         }
         return START_STICKY;
     }
@@ -163,7 +239,8 @@ public final class HotspotMonitorService extends Service {
             throw e.getCause() instanceof Exception ?
                     (Exception) e.getCause() : new IllegalStateException(e.getCause());
         }
-        CURRENT = new Snapshot(true, null, null);
+        Snapshot current = CURRENT;
+        CURRENT = new Snapshot(true, current.hotspotEnabled, current.clients);
         updateNotification(getString(R.string.monitor_initializing));
         // Android sends initial hotspot and client snapshots after registration.
     }
@@ -180,7 +257,7 @@ public final class HotspotMonitorService extends Service {
             aggregateClients = 0;
         }
         Integer count = Boolean.FALSE.equals(enabled) ? 0 : getClientCount();
-        CURRENT = new Snapshot(true, enabled, count);
+        CURRENT = new Snapshot(broadcastRegistered || callback != null, enabled, count);
         onNewSnapshot(before);
     }
 
@@ -191,8 +268,9 @@ public final class HotspotMonitorService extends Service {
         } else {
             clientsByInstance.put(instanceInfo.toString(), clientCount);
         }
-        int count = getClientCount();
-        CURRENT = new Snapshot(true, before.hotspotEnabled, count);
+        Integer count = getClientCount();
+        CLIENT_SOURCE = "WifiManager SoftApCallback";
+        CURRENT = new Snapshot(broadcastRegistered || callback != null, before.hotspotEnabled, count);
         onNewSnapshot(before);
     }
 
@@ -264,6 +342,11 @@ public final class HotspotMonitorService extends Service {
 
     @Override
     public void onDestroy() {
+        if (broadcastRegistered) {
+            try { unregisterReceiver(hotspotReceiver); }
+            catch (RuntimeException e) { Log.w(TAG, "Unregister broadcast failed", e); }
+            broadcastRegistered = false;
+        }
         if (wifi != null && unregister != null && callback != null) {
             try {
                 unregister.invoke(wifi, callback);
