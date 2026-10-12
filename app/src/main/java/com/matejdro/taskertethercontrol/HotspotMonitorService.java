@@ -116,7 +116,11 @@ public final class HotspotMonitorService extends Service {
             if (state != -1) {
                 STATE_SOURCE = "Android WIFI_AP_STATE_CHANGED broadcast";
                 Log.i(TAG, "Hotspot broadcast state=" + state);
-                onStateChanged(state);
+                try {
+                    onStateChanged(state);
+                } catch (RuntimeException | LinkageError failure) {
+                    recordMonitorError("Hotspot broadcast", failure);
+                }
             }
         }
     };
@@ -159,8 +163,26 @@ public final class HotspotMonitorService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        ensureChannel();
-        startForeground(NOTIFICATION, notification(getString(R.string.monitor_initializing)));
+        try {
+            ensureChannel();
+        } catch (RuntimeException | LinkageError error) {
+            // A broken notification channel must not crash the app.
+            LAST_ERROR = "Notification channel: " + error;
+            Log.e(TAG, LAST_ERROR, error);
+        }
+        try {
+            startForeground(NOTIFICATION, notification(getString(R.string.monitor_initializing)));
+        } catch (RuntimeException | LinkageError error) {
+            // Previously this exception escaped from onCreate and repeatedly
+            // crashed the entire app when Tasker tried to restart monitoring.
+            LAST_ERROR = "Foreground service unavailable: " + error.toString();
+            Log.e(TAG, LAST_ERROR, error);
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putBoolean(ENABLED, false).apply();
+            CURRENT = new Snapshot(false, null, null);
+            stopSelf();
+            return;
+        }
         // Hotspot state broadcasts work separately from the privileged client
         // callback. Missing NETWORK_SETTINGS must not disable hotspot detection.
         try {
@@ -231,13 +253,21 @@ public final class HotspotMonitorService extends Service {
                     String name = method.getName();
                     if ("onStateChanged".equals(name) && args != null && args.length > 0) {
                         STATE_SOURCE = "WifiManager SoftApCallback";
-                        onStateChanged(((Number) args[0]).intValue());
+                        try {
+                            onStateChanged(((Number) args[0]).intValue());
+                        } catch (RuntimeException | LinkageError failure) {
+                            recordMonitorError("Wi-Fi state callback", failure);
+                        }
                     } else if ("onConnectedClientsChanged".equals(name) &&
                             args != null && args.length > 0) {
                         Object last = args[args.length - 1];
                         if (last instanceof List<?>) {
-                            onClientsChanged(args.length == 2 ? args[0] : null,
-                                    ((List<?>) last).size());
+                            try {
+                                onClientsChanged(args.length == 2 ? args[0] : null,
+                                        ((List<?>) last).size());
+                            } catch (RuntimeException | LinkageError failure) {
+                                recordMonitorError("Wi-Fi client callback", failure);
+                            }
                         }
                     } else if ("hashCode".equals(name)) {
                         return System.identityHashCode(proxy);
@@ -260,9 +290,13 @@ public final class HotspotMonitorService extends Service {
             throw e.getCause() instanceof Exception ?
                     (Exception) e.getCause() : new IllegalStateException(e.getCause());
         }
+        // Some Android implementations invoke callbacks synchronously during
+        // registration. Do not overwrite the state those callbacks delivered.
         Snapshot current = CURRENT;
         CURRENT = new Snapshot(true, current.hotspotEnabled, current.clients);
-        updateNotification(getString(R.string.monitor_initializing));
+        if (current.hotspotEnabled == null) {
+            updateNotification(getString(R.string.monitor_initializing));
+        }
         // Android sends initial hotspot and client snapshots after registration.
     }
 
@@ -328,11 +362,20 @@ public final class HotspotMonitorService extends Service {
     }
 
     private void requestTaskerRequery() {
-        // Locale API requires the Activity class, not the broadcast receiver.
-        Intent event = new Intent(LocaleConstants.ACTION_REQUEST_QUERY);
-        event.putExtra(LocaleConstants.EXTRA_STRING_ACTIVITY_CLASS_NAME,
-                TetherConditionActivity.class.getName());
-        sendBroadcast(event);
+        // A profile re-query must never be able to crash the monitoring process.
+        try {
+            Intent event = new Intent(LocaleConstants.ACTION_REQUEST_QUERY);
+            event.putExtra(LocaleConstants.EXTRA_STRING_ACTIVITY_CLASS_NAME,
+                    TetherConditionActivity.class.getName());
+            sendBroadcast(event);
+        } catch (RuntimeException | LinkageError error) {
+            recordMonitorError("Requesting Tasker condition recheck", error);
+        }
+    }
+
+    private void recordMonitorError(String operation, Throwable error) {
+        LAST_ERROR = operation + ": " + error.toString();
+        Log.e(TAG, LAST_ERROR, error);
     }
 
     private void ensureChannel() {
@@ -369,7 +412,13 @@ public final class HotspotMonitorService extends Service {
     private void updateNotification(String message) {
         NotificationManager manager =
                 (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        if (manager != null) manager.notify(NOTIFICATION, notification(message));
+        if (manager != null) {
+            try {
+                manager.notify(NOTIFICATION, notification(message));
+            } catch (RuntimeException | LinkageError error) {
+                recordMonitorError("Updating monitor notification", error);
+            }
+        }
     }
 
     @Override
