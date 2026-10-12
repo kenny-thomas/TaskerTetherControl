@@ -1,0 +1,42 @@
+name: Compile unsigned APK for offline stable signing
+
+# Not a public release: produces an unsigned intermediate APK only.
+on:
+  push:
+    branches: [apk-compile]
+permissions:
+  contents: read
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Compile unsigned APK
+        run: gradle --no-daemon --stacktrace :app:assembleUnsignedCi
+      - name: Check unsigned APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -lh app/build/outputs/apk/unsignedCi/
+          apk="$(find app/build/outputs/apk/unsignedCi -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          test -n "$apk"
+          unzip -t "$apk" >/dev/null
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep "package: name='com.matejdro.taskertethercontrol'"
+          cp "$apk" TaskerTetherControl-unsigned.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TaskerTetherControl-unsigned-intermediate
+          path: TaskerTetherControl-unsigned.apk
+          retention-days: 7
+          if-no-files-found: error
