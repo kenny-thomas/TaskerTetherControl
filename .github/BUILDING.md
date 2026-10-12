@@ -97,3 +97,37 @@ with acknowledgement that this older API has no completion callback.
 Test **both** Enable and Disable on the actual Pixel 9 / Android 15 with
 the updated Magisk module active. APK compilation cannot validate device
 permissions, hidden APIs, or carrier entitlement.
+
+## Tasker State plugin conditions (Android 11+)
+
+In Tasker: **Profiles → State → Plugin → Tethering States**, choose
+**Hotspot enabled**, **Hotspot disabled**, **One or more devices connected**,
+or **No devices connected**. Press Back to save the condition.
+
+These conditions use the Locale `EDIT_CONDITION` / `QUERY_CONDITION` API,
+and the app broadcasts `ACTION_REQUEST_QUERY` on hotspot or client changes.
+Android Wi-Fi `SoftApCallback` gives both enabled state and connected-client
+lists without polling. A persistent foreground notification keeps the
+listener alive; it can be stopped from that notification. Monitoring resumes
+after reboot if previously enabled.
+
+**Important permissions:** API 30+ on-device `WifiManager.registerSoftApCallback`
+is a restricted system API requiring `NETWORK_SETTINGS`; the supplied Magisk
+permission XML has been extended to request it. After upgrading the APK,
+reinstall/update the Magisk module via the plugin and reboot, otherwise
+Tasker conditions will remain UNKNOWN. If hidden-API access is rejected on
+the device, the listener logs the error and shows a monitor-unavailable
+notification rather than reporting an incorrect false state.
+
+The NO CLIENTS condition is true when the hotspot has no clients,
+including when it is disabled. Combine it with the HOTSPOT ENABLED
+condition if you only want an enabled hotspot with zero clients.
+
+**Testing:** Try hotspot off; hotspot on with zero devices; one
+connected device; disconnect the last device; restart Android;
+turn monitoring off from its notification. Confirm that the profile
+enters/exits each state. Wi-Fi bridged mode requires per-instance
+client aggregation, which is implemented but not hardware verified.
+
+Note that the pre-existing Android 15 tethering ACTION implementation
+uses reflection and still requires live-device verification.
