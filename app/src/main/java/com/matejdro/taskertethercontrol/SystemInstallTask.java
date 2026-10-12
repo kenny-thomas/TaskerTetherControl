@@ -1,7 +1,9 @@
 package com.matejdro.taskertethercontrol;
 
 import android.app.AlertDialog;
+import android.app.Activity;
 import android.app.ProgressDialog;
+import android.util.Log;
 import android.content.Context;
 import android.os.AsyncTask;
 
@@ -48,7 +50,13 @@ class SystemInstallTask extends AsyncTask<Void, Void, Boolean> {
         progressDialog.setCancelable(false);
         progressDialog.setMessage(progressDialog.getContext()
                 .getString(R.string.magisk_install_progress));
-        progressDialog.show();
+        Context context = contextRef.get();
+        if (context instanceof Activity && ((Activity) context).isFinishing()) return;
+        try {
+            progressDialog.show();
+        } catch (RuntimeException e) {
+            Log.e("TaskerTetherInstall", "Unable to show Magisk install progress", e);
+        }
     }
 
     @Override
@@ -194,17 +202,30 @@ class SystemInstallTask extends AsyncTask<Void, Void, Boolean> {
 
     @Override
     protected void onPostExecute(Boolean success) {
-        if (progressDialog.isShowing()) {
-            progressDialog.dismiss();
+        try {
+            if (progressDialog.isShowing()) progressDialog.dismiss();
+        } catch (RuntimeException e) {
+            // The configuration Activity can finish while root install runs.
+            Log.w("TaskerTetherInstall", "Install progress window already closed", e);
         }
+
         Context context = contextRef.get();
-        if (context == null) {
-            return;
+        if (context == null) return;
+        if (context instanceof Activity) {
+            Activity activity = (Activity) context;
+            if (activity.isFinishing() || activity.isDestroyed()) {
+                Log.i("TaskerTetherInstall", "Activity closed; skipping install result dialog");
+                return;
+            }
         }
-        new AlertDialog.Builder(context)
-                .setTitle(success ? R.string.install_success : R.string.install_failed)
-                .setMessage(success ? context.getString(R.string.reboot_request) : errorMessage)
-                .setPositiveButton(android.R.string.ok, null)
-                .show();
+        try {
+            new AlertDialog.Builder(context)
+                    .setTitle(success ? R.string.install_success : R.string.install_failed)
+                    .setMessage(success ? context.getString(R.string.reboot_request) : errorMessage)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show();
+        } catch (RuntimeException e) {
+            Log.e("TaskerTetherInstall", "Cannot display install result dialog", e);
+        }
     }
 }
