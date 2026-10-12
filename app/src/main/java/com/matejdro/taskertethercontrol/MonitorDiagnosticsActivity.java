@@ -124,7 +124,7 @@ public final class MonitorDiagnosticsActivity extends Activity {
                 "Android: " + android.os.Build.VERSION.RELEASE +
                 " (API " + android.os.Build.VERSION.SDK_INT + ")\n\n" +
                 HotspotMonitorService.diagnostics(this) +
-                "\\n\\nLast recorded app crash:\\n" +
+                "\n\nLast recorded app crash:\n" +
                 TetherApplication.getCrashReport(this));
     }
 }
