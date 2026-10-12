@@ -276,8 +276,15 @@ public final class HotspotMonitorService extends Service {
         if (Boolean.FALSE.equals(enabled)) {
             clientsByInstance.clear();
             aggregateClients = 0;
+        } else if (Boolean.TRUE.equals(enabled) &&
+                !Boolean.TRUE.equals(before.hotspotEnabled)) {
+            // On transition from off to on, the old zero-client snapshot is
+            // stale until an actual client callback arrives.
+            clientsByInstance.clear();
+            aggregateClients = null;
         }
-        Integer count = Boolean.FALSE.equals(enabled) ? 0 : getClientCount();
+        Integer count = Boolean.FALSE.equals(enabled) ? 0
+                : (callback == null ? null : getClientCount());
         CURRENT = new Snapshot(broadcastRegistered || callback != null, enabled, count);
         onNewSnapshot(before);
     }
