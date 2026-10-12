@@ -9,8 +9,9 @@ import android.util.Log;
 public final class HotspotBootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
+        if (intent != null && Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
             try {
+                ProfileSelfCleanup.schedule(context);
                 HotspotMonitorService.startIfEnabled(context);
             } catch (RuntimeException error) {
                 Log.e("TaskerTetherState", "Unable to restart hotspot monitoring", error);

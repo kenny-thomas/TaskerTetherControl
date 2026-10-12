@@ -23,6 +23,10 @@ public final class TetherConditionReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         if (intent == null ||
                 !LocaleConstants.ACTION_QUERY_CONDITION.equals(intent.getAction())) return;
+        if (!ProfileSelfCleanup.monitorAllowed(context)) {
+            setResultCode(LocaleConstants.RESULT_CONDITION_UNKNOWN);
+            return;
+        }
         Bundle options = intent.getBundleExtra(LocaleConstants.EXTRA_BUNDLE);
         if (options == null) {
             TaskerQueryDiagnostics.queried(context, -1,

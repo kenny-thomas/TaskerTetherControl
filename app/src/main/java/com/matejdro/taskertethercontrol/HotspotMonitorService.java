@@ -139,6 +139,10 @@ public final class HotspotMonitorService extends Service {
     private Integer aggregateClients;
 
     static void retry(Context context) {
+        if (!ProfileSelfCleanup.monitorAllowed(context)) {
+            LAST_ERROR = "Only the primary user can run the hotspot monitor";
+            return;
+        }
         enableAndStart(context);
         Intent retry = new Intent(context, HotspotMonitorService.class).setAction(ACTION_RETRY);
         try {
@@ -150,12 +154,14 @@ public final class HotspotMonitorService extends Service {
     }
 
     static void enableAndStart(Context context) {
+        if (!ProfileSelfCleanup.monitorAllowed(context)) return;
         Context app = context.getApplicationContext();
         app.getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(ENABLED, true).apply();
         startIfEnabled(app);
     }
 
     static void startIfEnabled(Context context) {
+        if (!ProfileSelfCleanup.monitorAllowed(context)) return;
         Context app = context.getApplicationContext();
         SharedPreferences prefs = app.getSharedPreferences(PREFS, MODE_PRIVATE);
         if (!prefs.getBoolean(ENABLED, false)) return;
@@ -171,6 +177,16 @@ public final class HotspotMonitorService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        // A systemless privileged APK is visible in Android clone profiles.
+        // Do not allow each clone to post a second foreground notification.
+        if (!ProfileSelfCleanup.monitorAllowed(this)) {
+            CURRENT = new Snapshot(false, null, null);
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putBoolean(ENABLED, false).apply();
+            stopSelf();
+            return;
+        }
+        ProfileSelfCleanup.schedule(this);
         try {
             ensureChannel();
         } catch (RuntimeException | LinkageError error) {
@@ -212,6 +228,10 @@ public final class HotspotMonitorService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (!ProfileSelfCleanup.monitorAllowed(this)) {
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         if (intent != null && ACTION_STOP.equals(intent.getAction())) {
             getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(ENABLED, false).apply();
             stopSelf();

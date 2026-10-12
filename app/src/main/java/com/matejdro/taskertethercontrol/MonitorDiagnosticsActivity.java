@@ -50,6 +50,14 @@ public final class MonitorDiagnosticsActivity extends Activity {
         });
         panel.addView(restart);
 
+        Button clean = new Button(this);
+        clean.setText("Recheck and clean clone duplicate");
+        clean.setOnClickListener(v -> {
+            ProfileSelfCleanup.schedule(this);
+            status.postDelayed(this::refresh, 1200);
+        });
+        panel.addView(clean);
+
         Button reinstall = new Button(this);
         reinstall.setText(R.string.force_reinstall_magisk_module);
         reinstall.setOnClickListener(v -> showReinstallConfirmation());
@@ -128,6 +136,8 @@ public final class MonitorDiagnosticsActivity extends Activity {
                 "Android: " + android.os.Build.VERSION.RELEASE +
                 " (API " + android.os.Build.VERSION.SDK_INT + ")\n\n" +
                 HotspotMonitorService.diagnostics(this) +
+                "\n\nDuplicate app cleanup:\n" +
+                ProfileSelfCleanup.describe(this) +
                 "\n\nTasker condition transport:\n" +
                 TaskerQueryDiagnostics.describe(this) +
                 "\n\nLast recorded app crash:\n" +

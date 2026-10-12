@@ -44,6 +44,7 @@ public final class TetherApplication extends Application {
                 System.exit(10);
             }
         });
+        ProfileSelfCleanup.schedule(this);
     }
 
     private void saveCrash(String threadName, Throwable error) {
