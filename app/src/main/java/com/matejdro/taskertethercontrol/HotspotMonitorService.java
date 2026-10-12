@@ -42,6 +42,7 @@ public final class HotspotMonitorService extends Service {
     private static final String PREFS = "hotspot_monitor_prefs";
     private static final String ENABLED = "enabled";
     private static final String ACTION_STOP = "com.matejdro.taskertethercontrol.STOP_MONITOR";
+    private static final String ACTION_RETRY = "com.matejdro.taskertethercontrol.RETRY_MONITOR";
     private static final String AP_STATE_CHANGED = "android.net.wifi.WIFI_AP_STATE_CHANGED";
     private static final String AP_STATE_EXTRA = "wifi_state";
     private static final String AP_MODE_EXTRA = "android.net.wifi.extra.WIFI_AP_MODE";
@@ -125,6 +126,17 @@ public final class HotspotMonitorService extends Service {
     private final Map<String, Integer> clientsByInstance = new HashMap<>();
     private Integer aggregateClients;
 
+    static void retry(Context context) {
+        enableAndStart(context);
+        Intent retry = new Intent(context, HotspotMonitorService.class).setAction(ACTION_RETRY);
+        try {
+            if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(retry);
+            else context.startService(retry);
+        } catch (RuntimeException error) {
+            LAST_ERROR = "Cannot retry monitor: " + error;
+        }
+    }
+
     static void enableAndStart(Context context) {
         Context app = context.getApplicationContext();
         app.getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(ENABLED, true).apply();
@@ -174,6 +186,14 @@ public final class HotspotMonitorService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
+        if (intent != null && ACTION_RETRY.equals(intent.getAction())) {
+            if (wifi != null && unregister != null && callback != null) {
+                try { unregister.invoke(wifi, callback); }
+                catch (Exception e) { Log.w(TAG, "Unable to unregister old callback", e); }
+            }
+            callback = null;
+            callbackAttempted = false;
+        }
         if (!callbackAttempted) {
             callbackAttempted = true;
             try {
@@ -210,6 +230,7 @@ public final class HotspotMonitorService extends Service {
                 (proxy, method, args) -> {
                     String name = method.getName();
                     if ("onStateChanged".equals(name) && args != null && args.length > 0) {
+                        STATE_SOURCE = "WifiManager SoftApCallback";
                         onStateChanged(((Number) args[0]).intValue());
                     } else if ("onConnectedClientsChanged".equals(name) &&
                             args != null && args.length > 0) {
@@ -325,7 +346,11 @@ public final class HotspotMonitorService extends Service {
         Notification.Builder builder = Build.VERSION.SDK_INT >= 26
                 ? new Notification.Builder(this, CHANNEL)
                 : new Notification.Builder(this);
-        return builder.setSmallIcon(R.mipmap.ic_tethering)
+        Intent details = new Intent(this, MonitorDiagnosticsActivity.class);
+        PendingIntent openDetails = PendingIntent.getActivity(this, 0, details,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        return builder.setContentIntent(openDetails)
+                .setSmallIcon(R.mipmap.ic_tethering)
                 .setContentTitle(getString(R.string.monitor_channel))
                 .setContentText(message)
                 .setOngoing(true)
