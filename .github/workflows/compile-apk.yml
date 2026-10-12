@@ -22,10 +22,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-      - name: Compile unsigned APK
+      - name: Run regression tests and compile unsigned APK
         env:
           ALLOW_UNSIGNED_CI: 'true'
-        run: gradle --no-daemon --stacktrace :app:assembleUnsignedCi
+        run: gradle --no-daemon --stacktrace :app:testUnsignedCiUnitTest :app:assembleUnsignedCi
       - name: Check unsigned APK
         shell: bash
         run: |

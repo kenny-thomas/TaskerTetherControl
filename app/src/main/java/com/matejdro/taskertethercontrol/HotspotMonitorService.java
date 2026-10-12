@@ -189,8 +189,9 @@ public final class HotspotMonitorService extends Service {
             stopSelf();
             return;
         }
-        // Hotspot state broadcasts work separately from the privileged client
-        // callback. Missing NETWORK_SETTINGS must not disable hotspot detection.
+        // Hotspot broadcasts remain a fallback if the tethering service
+        // callback cannot register. On Android 15 the privileged Wi-Fi client
+        // callback is not available to our signing identity.
         try {
             registerReceiver(hotspotReceiver, new IntentFilter(AP_STATE_CHANGED));
             broadcastRegistered = true;
@@ -398,12 +399,24 @@ public final class HotspotMonitorService extends Service {
                 !Boolean.TRUE.equals(before.hotspotEnabled)) {
             // On transition from off to on, the old zero-client snapshot is
             // stale until an actual client callback arrives.
-            clientsByInstance.clear();
-            aggregateClients = null;
+            // Preserve an already-delivered, positive tethering client
+            // snapshot. It is evidence of clients even if callback order differs
+            // across Android builds. A zero observed while the hotspot was off
+            // must not be treated as a fresh "no clients" snapshot.
+            if (!(tetherEvents != null && aggregateClients != null &&
+                    aggregateClients > 0)) {
+                clientsByInstance.clear();
+                aggregateClients = null;
+            }
         }
-        Integer count = Boolean.FALSE.equals(enabled) ? 0
-                : (callback == null && tetherEvents == null ? null : getClientCount());
-        CURRENT = new Snapshot(broadcastRegistered || callback != null, enabled, count);
+        // Do NOT use a mixed int/Integer ternary here. Java unboxes the nullable
+        // Integer branch and throws NPE when the hotspot comes up before the
+        // first client callback (the v1.4.9 regression).
+        Integer count = HotspotClientSnapshot.knownCount(enabled,
+                callback != null || tetherEvents != null, getClientCount());
+        CURRENT = new Snapshot(
+                broadcastRegistered || callback != null || tetherEvents != null,
+                enabled, count);
         onNewSnapshot(before);
     }
 
