@@ -5,7 +5,7 @@ The shared Android rules and skills repository is pinned as the Git submodule `.
 ## Mandatory agent startup
 
 1. If accessible but uninitialized, run `git submodule update --init --recursive`. Report missing access/instructions; never fabricate shared rules.
-2. Read `.agents/rules/INDEX.md` and all six core rule files before Android changes.
+2. Read `.agents/rules/INDEX.md` and all core rule files listed in the index before Android changes.
 3. Read these relevant domain rules: `.agents/rules/tasker.md`, `.agents/rules/privileged-android.md`. Read other domain rules when the task warrants.
 4. Consult `.agents/skills/README.md` and read the applicable skills **before** doing the task:
    - `.agents/skills/tasker-locale-action/SKILL.md`
@@ -31,3 +31,7 @@ Tasker tethering action and state conditions, systemless Magisk integration and 
 ## Precedence and updating shared guidance
 
 Explicit task instructions and this project's root `AGENTS.md` take precedence over generic shared procedures. Do not trigger unintended builds or claim device validation from CI alone. An update to the shared repository does not automatically update this project's pinned `.agents` gitlink; review the new shared revision and commit a gitlink update deliberately.
+
+## Authoritative project configuration
+
+Before implementation or build work, read `README.md` and `.github/workflows/build-apk.yml`, `.github/workflows/compile-apk.yml`, `app/build.gradle`, `build.gradle`, `settings.gradle`. Use these project files to establish the current toolchain/SDK versions, package identity, signing configuration and expected certificate where documented, build triggers, artifact publication steps and required tests. Inspect referenced test and validation files for the task. Report missing certificate or workflow information rather than inventing it; do not copy signing secrets into instructions.
